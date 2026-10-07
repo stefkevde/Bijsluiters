@@ -1,95 +1,72 @@
-# Lokale AI-assistent voor medicatie-info (demo)
+# Local AI Assistant for Medication Information (Demo)
 
-Een klein, volledig **lokaal draaiend** RAG-systeem (Retrieval-Augmented
-Generation) dat vragen beantwoordt op basis van een set documenten —
-gedacht vanuit een apotheekcontext.
+A small, fully **local RAG system** (Retrieval-Augmented Generation) that answers questions based on a set of documents — designed with a pharmacy context in mind.
 
-## Waarom lokaal?
+## Why local?
 
-In de apotheeksector kan een vraag over medicatie makkelijk herleidbaar zijn
-naar een patiënt ("wat mag ik combineren met mijn bloeddrukmedicatie?").
-Die data via een externe API (OpenAI, Anthropic, ...) sturen is dan al snel
-een GDPR-vraagstuk — zeker met de AI Act erbij, die net extra eisen stelt
-aan AI-toepassingen die met gevoelige, medische context werken.
+In the pharmacy sector, a question about medication can easily be linked to a patient ("what can I combine with my blood pressure medication?"). Sending that data through an external API (OpenAI, Anthropic, ...) can quickly raise GDPR concerns — especially when considering the AI Act, which introduces additional requirements for AI applications dealing with sensitive medical contexts.
 
-Dit project draait daarom volledig via **[Ollama](https://ollama.com)** op
-je eigen machine:
-- Geen document, geen vraag en geen antwoord verlaat het toestel.
-- Het embedding-model en het taalmodel zijn beide **quantized** (4-bit),
-  zodat ze vlot draaien op een gewone laptop zonder GPU.
-- De code zelf maakt dit zichtbaar: er zit geen enkele cloud-API-call in
-  (`ollama_client.py` praat alleen met `localhost`).
+This project therefore runs entirely through [**Ollama**](https://ollama.com) on your own machine:
 
-Dit is bewust een **demo/proof-of-concept**, geen productieklare tool. De
-voorbeelddocumenten in `data/` zijn fictieve, vereenvoudigde placeholder-
-teksten — géén officiële bijsluiters — puur om de pijplijn te tonen.
+- No document, question, or answer leaves the device.
+- Both the embedding model and the language model are **quantized** (4-bit), allowing them to run smoothly on a regular laptop without a GPU.
+- The code itself makes this explicit: there are no cloud API calls (`ollama_client.py` only communicates with `localhost`).
 
-## Hoe het werkt
+This is deliberately a **demo/proof of concept**, not a production-ready tool. The example documents in `data/` are fictional, simplified placeholder texts — **not official patient leaflets** — and are solely intended to demonstrate the pipeline.
 
-1. **`ingest.py`** — leest de `.txt`-bestanden in `data/`, hakt ze in
-   overlappende stukken (chunks), en berekent er lokaal een embedding voor
-   via Ollama. Alles wordt weggeschreven naar `embeddings.json` (een simpele
-   lokale "vectorstore" — geen aparte databank nodig voor deze schaal).
-2. **`query.py`** — embedt je vraag, zoekt via cosine similarity de meest
-   relevante chunks op, en stuurt die als context naar het lokale
-   taalmodel, met de instructie om **altijd de bron te vermelden** en
-   **niets te verzinnen** als het antwoord niet in de documenten staat.
+## How it works
 
-Dit is bewust *niet* meteen naar een taalmodel gooien: RAG is hier zinvol
-omdat je wil dat antwoorden **herleidbaar** zijn naar een concreet document
-— cruciaal in een medische/apotheekcontext.
+1. **`ingest.py`** — reads the `.txt` files from `data/`, splits them into overlapping chunks, and calculates a local embedding for each chunk through Ollama. Everything is stored in `embeddings.json` (a simple local "vector store" — no separate database is required at this scale).
+2. **`query.py`** — embeds the user's question, searches for the most relevant chunks using cosine similarity, and sends them as context to the local language model, with instructions to **always cite the source** and **not make anything up** if the answer is not contained in the documents.
 
-## Installatie
+This deliberately does *not* immediately send the question to a language model: RAG makes sense here because answers should be **traceable** to a specific document — crucial in a medical/pharmacy context.
+
+## Installation
 
 ```bash
-# 1. Ollama installeren (macOS/Linux/Windows): zie https://ollama.com/download
+# 1. Install Ollama (macOS/Linux/Windows): see https://ollama.com/download
 
-# 2. De twee modellen ophalen (worden lokaal quantized bewaard)
+# 2. Pull the two models (stored locally in quantized form)
 ollama pull nomic-embed-text
 ollama pull llama3.1:8b-instruct-q4_K_M
 
-# 3. Python-dependencies
+# 3. Install Python dependencies
 pip install -r requirements.txt
 ```
 
-## Gebruik
+## Usage
 
 ```bash
-# Stap 1: documenten inlezen en embedden (eenmalig, of opnieuw bij wijzigingen)
+# Step 1: Ingest and embed the documents (once, or again when documents change)
 python ingest.py
 
-# Stap 2: een vraag stellen
-python query.py "Waar moet ik op letten bij paracetamol?"
+# Step 2: Ask a question
+python query.py "What should I be aware of when taking paracetamol?"
 ```
 
-Voorbeelduitvoer:
+Example output:
 
-```
-Vraag embedden en relevante fragmenten opzoeken...
-Gevonden bronnen: paracetamol_info.txt
-Antwoord genereren...
+```markdown
+Embedding the question and searching for relevant passages...
+Sources found: paracetamol_info.txt
+Generating answer...
 
 ============================================================
-Volgens paracetamol_info.txt is extra voorzichtigheid aangewezen bij
-leverproblemen, en wordt gelijktijdig gebruik met andere paracetamol-
-bevattende producten afgeraden. Voor de volledige, actuele informatie
-verwijst het document zelf door naar het BCFI of de officiële bijsluiter.
+According to paracetamol_info.txt, extra caution is advised
+for people with liver problems, and simultaneous use with
+other paracetamol-containing products is discouraged. For
+complete and up-to-date information, the document itself
+refers to the BCFI or the official patient leaflet.
 ============================================================
 ```
 
-## Volgende stappen (als dit verder zou gaan dan een demo)
+## Next steps (if this were taken beyond a demo)
 
-- Chunking vervangen door iets robuuster dan woord-tellen (bv. op zinsgrens).
-- `embeddings.json` vervangen door een echte lokale vectordatabank
-  (bv. Chroma of SQLite + sqlite-vec) zodra het aantal documenten groeit.
-- Tracing/logging toevoegen (welke chunks werden gebruikt, hoe lang het
-  duurde, hoeveel tokens) — observability vanaf dag één, zoals in de
-  functie-eisen van deze vacature ook expliciet gevraagd wordt.
-- Een echte, geautoriseerde databron aankoppelen (bv. BCFI) in plaats van
-  losse `.txt`-bestanden.
+- Replace word-count-based chunking with something more robust, such as sentence-based chunking.
+- Replace `embeddings.json` with a proper local vector database (e.g. Chroma or SQLite + sqlite-vec) once the number of documents grows.
+- Add tracing/logging (which chunks were used, how long processing took, how many tokens were used) — implementing observability from day one, as explicitly mentioned in the requirements for this position.
+- Connect an actual authorized data source (e.g. BCFI) instead of separate `.txt` files.
 
 ## Disclaimer
 
-De inhoud in `data/` is fictief en enkel bedoeld om de technische pijplijn
-te demonstreren. Dit is geen medisch advies en geen vervanging voor de
-officiële bijsluiter, het BCFI, of een gesprek met een apotheker of arts.
+The content in `data/` is fictional and intended solely to demonstrate the technical pipeline. This is **not medical advice** and is not a substitute for the official patient leaflet, BCFI, or consultation with a pharmacist or physician.
